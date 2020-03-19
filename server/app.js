@@ -1,10 +1,19 @@
 const express = require('express');
-
+const rateLimit = require("express-rate-limit");
 const carriers = require('../lib/carriers.js');
 const providers = require('../lib/providers.js');
 const text = require('../lib/text');
+require('dotenv').config()
 
 const app = express();
+const API_KEYS = new Set(process.env.TEXT_API_KEYS.split(','));
+const apiLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, //60  minutes
+  max: 5000
+});
+app.use("/text/", apiLimiter);
+app.use("/canada/", apiLimiter);
+app.use("/intl/", apiLimiter);
 
 // Express config
 app.use(express.json());
@@ -27,6 +36,16 @@ function stripPhone(phone) {
 }
 
 function textRequestHandler(req, res, number, carrier, region) {
+  if (!req.body.api_key) {
+    res.send({ success: false, message: 'Missing API Key.' });
+    return;
+  }
+
+  if (!API_KEYS.has(req.body.api_key)) {
+    res.send({ success: false, message: 'Wrong API Key.' });
+    return;
+  }
+
   if (!number || !req.body.message) {
     res.send({ success: false, message: 'Number and message parameters are required.' });
     return;
